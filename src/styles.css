@@ -1,0 +1,56 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@theme inline {
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-display: "Bebas Neue", sans-serif;
+  --font-sans: "Barlow", sans-serif;
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.27 0.06 150);
+  --foreground: oklch(0.97 0.01 120);
+  --card: oklch(0.33 0.07 150);
+  --card-foreground: oklch(0.97 0.01 120);
+  --primary: oklch(0.88 0.19 120);
+  --primary-foreground: oklch(0.2 0.05 150);
+  --secondary: oklch(0.4 0.07 150);
+  --secondary-foreground: oklch(0.97 0.01 120);
+  --muted: oklch(0.38 0.06 150);
+  --muted-foreground: oklch(0.78 0.04 140);
+  --accent: oklch(0.8 0.15 75);
+  --accent-foreground: oklch(0.2 0.05 150);
+  --destructive: oklch(0.65 0.2 25);
+  --border: oklch(0.97 0.01 120 / 18%);
+  --input: oklch(0.97 0.01 120 / 22%);
+  --ring: oklch(0.88 0.19 120);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    background-image: repeating-linear-gradient(90deg, oklch(1 0 0 / 3%) 0 80px, transparent 80px 160px);
+  }
+}
