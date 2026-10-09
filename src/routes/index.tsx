@@ -1,13 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import logo from "../assets/canela-de-vidro-logo.png";
+//import logo from "@/assets/canela-de-vidro-logo.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Racha de Terça — Sorteio de Times" },
-      { name: "description", content: "Sorteie os times do futebol de terça, com goleiros fixos e troca de jogadores." },
-      { property: "og:title", content: "Racha de Terça — Sorteio de Times" },
-      { property: "og:description", content: "Sorteie os times do futebol de terça." },
+      { title: "Canela de Vidro FC — Sorteio de Times" },
+      { name: "description", content: "Sorteie os times do Canela de Vidro FC, com goleiros fixos e troca de jogadores." },
+      { property: "og:title", content: "Canela de Vidro FC — Sorteio de Times" },
+      { property: "og:description", content: "Sorteio dos times do Canela de Vidro FC, com goleiros fixos e fila de partidas." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -30,6 +32,22 @@ type State = {
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const KEY = "racha-terca-v1";
 const initial: State = { players: [], keepers: [], perTeam: 6, teams: [], labels: [], log: [] };
+
+// Completa automaticamente os times da fila: um time incompleto recebe
+// jogadores sorteados dos times que estão atrás dele na fila.
+function autofill(teams: string[][], labels: string[], perTeam: number, log: string[]) {
+  for (let i = 2; i < teams.length; i++) {
+    const t = teams[i];
+    if (!t || t.length >= perTeam) continue;
+    for (let j = teams.length - 1; j > i && t.length < perTeam; j--) {
+      const donor = shuffle(teams[j] ?? []);
+      while (t.length < perTeam && donor.length) t.push(donor.shift()!);
+      teams[j] = donor;
+      if (donor.length === 0) { teams.splice(j, 1); labels.splice(j, 1); }
+    }
+    if (t.length >= perTeam) log.push(`Time ${labels[i]} completado: entra com ${t.join(", ")}.`);
+  }
+}
 
 function shuffle<T>(a: T[]) {
   const b = [...a];
@@ -107,6 +125,7 @@ function Index() {
       }
     }
 
+    autofill(teams, labels, s.perTeam, log);
     setS({
       ...s,
       players: s.players.filter((_, j) => j !== i),
@@ -122,7 +141,10 @@ function Index() {
     const sh = shuffle(present);
     const teams: string[][] = [];
     for (let i = 0; i < sh.length; i += s.perTeam) teams.push(sh.slice(i, i + s.perTeam));
-    setS({ ...s, teams, labels: teams.map((_, i) => LETTERS[i] ?? String(i + 1)), log: ["Times sorteados!"], fk: [s.keepers[0] ?? null, s.keepers[1] ?? null], kq: s.keepers.slice(2) });
+    const labels = teams.map((_, i) => LETTERS[i] ?? String(i + 1));
+    const log = ["Times sorteados!"];
+    autofill(teams, labels, s.perTeam, log);
+    setS({ ...s, teams, labels, log, fk: [s.keepers[0] ?? null, s.keepers[1] ?? null], kq: s.keepers.slice(2) });
   };
 
   const lose = (idx: 0 | 1) => {
@@ -167,6 +189,7 @@ function Index() {
     const loserK = fk[idx] ?? null;
     let inK = loserK;
     if (loserK && kq.length) { inK = kq.shift()!; kq.push(loserK); log.push(`Goleiro ${loserK} sai, entra ${inK}.`); }
+    autofill(newTeams, newLabels, s.perTeam, log);
     setS({ ...s, fk: [fk[1 - idx] ?? null, inK], kq, teams: newTeams, labels: newLabels, log: [...log.reverse(), ...s.log].slice(0, 20) });
   };
 
@@ -195,6 +218,7 @@ function Index() {
         log.push(`${n} chegou atrasado e abriu o time ${labels[teams.length - 1]}.`);
       }
     }
+    autofill(teams, labels, s.perTeam, log);
     setS({ ...s, teams, labels, log: [...log.reverse(), ...s.log].slice(0, 20) });
     setLate("");
   };
@@ -203,7 +227,9 @@ function Index() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-8 text-center">
-        <h1 className="font-display text-6xl tracking-wide text-primary md:text-7xl">Racha de Terça</h1>
+        <h1>
+          <img src={logo.url} alt="Canela de Vidro FC" width={640} height={640} className="mx-auto mb-3 h-40 w-40 object-contain md:h-48 md:w-48" />
+        </h1>
         <p className="text-muted-foreground">Sorteio dos times · {s.perTeam} na linha + 1 no gol</p>
       </header>
 
