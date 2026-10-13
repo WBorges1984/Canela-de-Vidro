@@ -228,7 +228,7 @@ function Index() {
     <main className="mx-auto max-w-5xl px-4 py-8">
       <header className="mb-8 text-center">
         <h1>
-          <img src={logo.url} alt="Canela de Vidro FC" width={640} height={640} className="mx-auto mb-3 h-40 w-40 object-contain md:h-48 md:w-48" />
+          <img src={logo} alt="Canela de Vidro FC" width={640} height={640} className="mx-auto mb-3 h-40 w-40 object-contain md:h-48 md:w-48" />
         </h1>
         <p className="text-muted-foreground">Sorteio dos times · {s.perTeam} na linha + 1 no gol</p>
       </header>
