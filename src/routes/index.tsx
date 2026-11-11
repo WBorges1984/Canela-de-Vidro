@@ -357,7 +357,7 @@ function Index() {
                           <h3 className="font-display text-4xl text-primary">Time {s.labels[i]}</h3>
                           <span className="text-sm text-muted-foreground">Linha: {s.teams[i].length}/{s.perTeam}</span>
                         </div>
-                        <p className="mb-2 rounded-md bg-secondary px-2 py-1 text-sm text-accent">🧤 Gol (não conta na linha): {keeperFor(i)}</p>
+                        <p className="mb-2 rounded-md bg-secondary px-2 py-1 text-sm text-accent">🧤 Gol: {keeperFor(i)}</p>
                         <ol className="mb-4 list-inside list-decimal space-y-0.5">
                           {s.teams[i].map((p) => <li key={p}>{p}{s.players.some((q) => q.name === p && q.monthly) && <Star aria-label="Mensalista" className="ml-1 inline size-3.5 fill-current text-accent" />}</li>)}
                         </ol>
