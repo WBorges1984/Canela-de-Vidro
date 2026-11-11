@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-// import logo from "@/assets/canela-de-vidro-logo.png.asset.json";
 import logo from "../assets/canela-de-vidro-logo.png";
-import { Star } from "lucide-react";
+import { Star } from  "lucide-react";
 import { Button } from "../components/button";
+import { parsePlayerList } from "@/lib/import-list";
 import { initialTeams, lateTeamIndex, shuffle, type Player } from "@/lib/team-draw";
 
 export const Route = createFileRoute("/")({
@@ -30,6 +30,7 @@ type State = {
   log: string[];
   fk?: (string | null)[];
   kq?: string[];
+  cards?: Record<string, { y: number; b: boolean }>;
 };
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -58,6 +59,17 @@ function Index() {
   const [name, setName] = useState("");
   const [keeper, setKeeper] = useState("");
   const [late, setLate] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [secs, setSecs] = useState(0);
+  const [running, setRunning] = useState(false);
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setSecs((x) => x + 1), 1000);
+    return () => clearInterval(id);
+  }, [running]);
+  const clock = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+  const card = (n: string) => s.cards?.[n] ?? { y: 0, b: false };
+  const setCard = (n: string, c: { y: number; b: boolean }) => setS({ ...s, cards: { ...(s.cards ?? {}), [n]: c } });
 
 
   useEffect(() => {
@@ -69,6 +81,7 @@ function Index() {
     if (loaded) localStorage.setItem(KEY, JSON.stringify(s));
   }, [s, loaded]);
 
+  const [paste, setPaste] = useState("");
   const present = s.players.filter((p) => p.present).map((p) => p.name);
 
   const addPlayer = () => {
@@ -76,6 +89,26 @@ function Index() {
       .filter((n) => !s.players.some((p) => p.name === n));
     if (names.length) setS({ ...s, players: [...s.players, ...names.map((n) => ({ name: n, present: true }))] });
     setName("");
+  };
+
+  const importList = () => {
+    const parsed = parsePlayerList(paste);
+    if (!parsed.length) { alert("Nenhum jogador encontrado na lista."); return; }
+    const players = [...s.players];
+    for (const p of parsed) {
+      const ex = players.findIndex((q) => q.name.toLowerCase() === p.name.toLowerCase());
+      if (ex >= 0) players[ex] = { ...players[ex]!, present: true, monthly: p.monthly };
+      else players.push({ name: p.name, present: true, monthly: p.monthly });
+    }
+    setS({ ...s, players });
+    setPaste("");
+  };
+
+  const resetAll = () => {
+    if (!confirmReset) { setConfirmReset(true); return; }
+    setConfirmReset(false);
+    setSecs(0); setRunning(false);
+    setS({ ...initial, perTeam: s.perTeam, maxMonthly: s.maxMonthly ?? 4 });
   };
 
   const removePlayer = (i: number) => {
@@ -241,6 +274,14 @@ function Index() {
               />
               <button onClick={addPlayer} className="rounded-md bg-primary px-4 font-semibold text-primary-foreground">+</button>
             </div>
+            <textarea
+              value={paste}
+              onChange={(e) => setPaste(e.target.value)}
+              placeholder="Cole aqui a lista do WhatsApp (mensalistas ganham estrela)"
+              rows={3}
+              className="mt-3 w-full rounded-md border bg-secondary px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            <button onClick={importList} disabled={!paste.trim()} className="mt-1 w-full rounded-md bg-accent py-2 text-sm font-semibold text-accent-foreground disabled:opacity-40">Importar lista</button>
             <ul className="mt-3 max-h-72 space-y-1 overflow-auto">
               {s.players.map((p, i) => (
                 <li key={p.name} className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-secondary">
@@ -337,6 +378,8 @@ function Index() {
               disabled={present.length < 2}
               className="mt-4 w-full rounded-md bg-primary py-3 font-display text-3xl tracking-wide text-primary-foreground disabled:opacity-40"
             >⚽ Sortear times</button>
+            <button onClick={resetAll} className={`mt-3 w-full rounded-md border border-destructive py-2 text-sm font-semibold ${confirmReset ? "bg-destructive text-destructive-foreground" : "text-destructive"}`}>{confirmReset ? "Clique de novo para confirmar: apagar tudo" : "Zerar tudo"}</button>
+            {confirmReset && <button onClick={() => setConfirmReset(false)} className="mt-1 w-full text-sm text-muted-foreground">Cancelar</button>}
           </div>
         </section>
 
@@ -348,6 +391,13 @@ function Index() {
           ) : (
             <>
               <div>
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border bg-card p-4">
+                  <span className="font-display text-5xl tabular-nums" aria-label="Cronômetro">{clock}</span>
+                  <div className="flex gap-2">
+                    <Button onClick={() => setRunning(!running)}>{running ? "Pausar" : "Iniciar"}</Button>
+                    <Button variant="secondary" onClick={() => { setRunning(false); setSecs(0); }}>Zerar</Button>
+                  </div>
+                </div>
                 <h2 className="mb-3 font-display text-3xl tracking-wide">Em campo</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {[0, 1].map((i) =>
@@ -358,8 +408,16 @@ function Index() {
                           <span className="text-sm text-muted-foreground">Linha: {s.teams[i].length}/{s.perTeam}</span>
                         </div>
                         <p className="mb-2 rounded-md bg-secondary px-2 py-1 text-sm text-accent">🧤 Gol: {keeperFor(i)}</p>
-                        <ol className="mb-4 list-inside list-decimal space-y-0.5">
-                          {s.teams[i].map((p) => <li key={p}>{p}{s.players.some((q) => q.name === p && q.monthly) && <Star aria-label="Mensalista" className="ml-1 inline size-3.5 fill-current text-accent" />}</li>)}
+                        <p className="mb-1 text-right text-xs text-muted-foreground">🟨 🟨 🟦</p>
+                        <ol className="mb-4 space-y-0.5">
+                          {s.teams[i].map((p) => { const c = card(p); return (
+                            <li key={p} className="flex items-center gap-2">
+                              <span className="flex-1">{p}{s.players.some((q) => q.name === p && q.monthly) && <Star aria-label="Mensalista" className="ml-1 inline size-3.5 fill-current text-accent" />}</span>
+                              {[1, 2].map((n) => (
+                                <label key={n} title={`${n}º amarelo`} className="flex items-center"><input type="checkbox" aria-label={`${n}º cartão amarelo de ${p}`} checked={c.y >= n} onChange={() => setCard(p, { ...c, y: c.y >= n ? n - 1 : n })} className="size-4 accent-[oklch(0.85_0.17_95)]" /></label>
+                              ))}
+                              <label title="Cartão azul" className="flex items-center"><input type="checkbox" aria-label={`Cartão azul de ${p}`} checked={c.b} onChange={() => setCard(p, { ...c, b: !c.b })} className="size-4 accent-[oklch(0.6_0.18_250)]" /></label>
+                            </li>); })}
                         </ol>
                         {s.teams[1] && (
                           <button onClick={() => lose(i as 0 | 1)} className="w-full rounded-md bg-destructive py-2 font-semibold">
