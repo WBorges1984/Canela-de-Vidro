@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+// import logo from "@/assets/canela-de-vidro-logo.png.asset.json";
 import logo from "../assets/canela-de-vidro-logo.png";
-//import logo from "@/assets/canela-de-vidro-logo.png";
+import { Star } from "lucide-react";
+import { Button } from "../components/button";
+import { initialTeams, lateTeamIndex, shuffle, type Player } from "@/lib/team-draw";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -17,11 +20,11 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Player = { name: string; present: boolean };
 type State = {
   players: Player[];
   keepers: string[];
   perTeam: number;
+  maxMonthly?: number;
   teams: string[][]; // [0] e [1] em campo, resto na fila
   labels: string[];
   log: string[];
@@ -47,15 +50,6 @@ function autofill(teams: string[][], labels: string[], perTeam: number, log: str
     }
     if (t.length >= perTeam) log.push(`Time ${labels[i]} completado: entra com ${t.join(", ")}.`);
   }
-}
-
-function shuffle<T>(a: T[]) {
-  const b = [...a];
-  for (let i = b.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const t = b[i] as T; b[i] = b[j] as T; b[j] = t;
-  }
-  return b;
 }
 
 function Index() {
@@ -138,9 +132,7 @@ function Index() {
   };
 
   const draw = () => {
-    const sh = shuffle(present);
-    const teams: string[][] = [];
-    for (let i = 0; i < sh.length; i += s.perTeam) teams.push(sh.slice(i, i + s.perTeam));
+    const teams = initialTeams(s.players, s.perTeam, s.maxMonthly ?? 4);
     const labels = teams.map((_, i) => LETTERS[i] ?? String(i + 1));
     const log = ["Times sorteados!"];
     autofill(teams, labels, s.perTeam, log);
@@ -197,7 +189,7 @@ function Index() {
     s.fk?.[i] ?? "Voluntário";
 
   const addLate = () => {
-    const names = late.split(/[\n,]/).map((n) => n.trim()).filter(Boolean)
+    const names = [...new Set(late.split(/[\n,]/).map((n) => n.trim()).filter(Boolean))]
       .filter((n) => !s.teams.flat().includes(n));
     if (!names.length || !s.teams.length) return;
     const teams = s.teams.map((t) => [...t]);
@@ -205,12 +197,9 @@ function Index() {
     const log: string[] = [];
     for (const n of names) {
       // o time da vez (primeiro da fila) tem prioridade; senão, o primeiro time que não estiver completo
-      const vezIncompleto = teams.length > 2 && teams[2]!.length < s.perTeam;
-      const openIdx = vezIncompleto
-        ? 2
-        : teams.findIndex((t) => t.length < s.perTeam);
+      const openIdx = lateTeamIndex(teams, s.perTeam);
       if (openIdx >= 0) {
-        teams[openIdx] = [...teams[openIdx]!, n];
+        teams[openIdx] = [...(teams[openIdx] ?? []), n];
         log.push(`${n} chegou atrasado e entrou no time ${labels[openIdx]}.`);
       } else {
         teams.push([n]);
@@ -219,7 +208,11 @@ function Index() {
       }
     }
     autofill(teams, labels, s.perTeam, log);
-    setS({ ...s, teams, labels, log: [...log.reverse(), ...s.log].slice(0, 20) });
+    const players = s.players.map((p) => names.includes(p.name) ? { ...p, present: true } : p);
+    for (const n of names) {
+      if (!players.some((p) => p.name === n)) players.push({ name: n, present: true });
+    }
+    setS({ ...s, players, teams, labels, log: [...log.reverse(), ...s.log].slice(0, 20) });
     setLate("");
   };
 
@@ -253,11 +246,21 @@ function Index() {
                 <li key={p.name} className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-secondary">
                   <input
                     type="checkbox"
+                    aria-label={`Presença de ${p.name}`}
                     checked={p.present}
                     className="accent-primary"
                     onChange={() => setS({ ...s, players: s.players.map((q, j) => (j === i ? { ...q, present: !q.present } : q)) })}
                   />
-                  <span className={p.present ? "" : "text-muted-foreground line-through"}>{p.name}</span>
+                  <span className={`min-w-0 flex-1 break-words ${p.present ? "" : "text-muted-foreground line-through"}`}>{p.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Mensalista: ${p.name}`}
+                    aria-pressed={Boolean(p.monthly)}
+                    title={p.monthly ? "Retirar mensalista" : "Marcar mensalista"}
+                    className={`shrink-0 ${p.monthly ? "text-accent" : "text-muted-foreground"}`}
+                    onClick={() => setS({ ...s, players: s.players.map((q, j) => j === i ? { ...q, monthly: !q.monthly } : q) })}
+                  ><Star className={p.monthly ? "fill-current" : ""} /></Button>
                   <button
                     onClick={() => removePlayer(i)}
                     title="Excluir jogador"
@@ -310,8 +313,22 @@ function Index() {
               {[4, 5, 6, 7].map((n) => (
                 <button
                   key={n}
-                  onClick={() => setS({ ...s, perTeam: n })}
+                  onClick={() => {
+                    if (n === s.perTeam) return;
+                    if (s.teams.length && !confirm("Mudar o número de jogadores apaga os times atuais. Sortear de novo depois?")) return;
+                    setS({ ...s, perTeam: n, teams: [], labels: [], log: [] });
+                  }}
                   className={`flex-1 rounded-md py-2 font-display text-2xl ${s.perTeam === n ? "bg-primary text-primary-foreground" : "bg-secondary"}`}
+                >{n}</button>
+              ))}
+            </div>
+            <h2 className="mb-3 mt-5 font-display text-2xl tracking-wide">Máx. mensalistas por time</h2>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setS({ ...s, maxMonthly: n })}
+                  className={`flex-1 rounded-md py-2 font-display text-2xl ${(s.maxMonthly ?? 4) === n ? "bg-primary text-primary-foreground" : "bg-secondary"}`}
                 >{n}</button>
               ))}
             </div>
@@ -338,11 +355,11 @@ function Index() {
                       <div key={i} className="rounded-lg border-2 border-primary bg-card p-4">
                         <div className="flex items-baseline justify-between">
                           <h3 className="font-display text-4xl text-primary">Time {s.labels[i]}</h3>
-                          <span className="text-sm text-muted-foreground">{s.teams[i].length}/{s.perTeam}</span>
+                          <span className="text-sm text-muted-foreground">Linha: {s.teams[i].length}/{s.perTeam}</span>
                         </div>
-                        <p className="mb-2 text-sm text-accent">🧤 {keeperFor(i)}</p>
+                        <p className="mb-2 rounded-md bg-secondary px-2 py-1 text-sm text-accent">🧤 Gol (não conta na linha): {keeperFor(i)}</p>
                         <ol className="mb-4 list-inside list-decimal space-y-0.5">
-                          {s.teams[i].map((p) => <li key={p}>{p}</li>)}
+                          {s.teams[i].map((p) => <li key={p}>{p}{s.players.some((q) => q.name === p && q.monthly) && <Star aria-label="Mensalista" className="ml-1 inline size-3.5 fill-current text-accent" />}</li>)}
                         </ol>
                         {s.teams[1] && (
                           <button onClick={() => lose(i as 0 | 1)} className="w-full rounded-md bg-destructive py-2 font-semibold">
@@ -367,7 +384,7 @@ function Index() {
                             {t.length}/{s.perTeam}
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground">{t.join(", ")}</p>
+                        <p className="text-sm text-muted-foreground">{t.map((p, index) => <span key={p}>{index > 0 && ", "}{p}{s.players.some((q) => q.name === p && q.monthly) && <Star aria-label="Mensalista" className="ml-1 inline size-3.5 fill-current text-accent" />}</span>)}</p>
                       </div>
                     ))}
                   </div>
